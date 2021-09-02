@@ -19,7 +19,7 @@ env:
 #      - DEB Repository
 #      - Upload to Github pages
 #   -> docker
-#      - Generate nugulinux/sdk:unstable docker image
+#      - Generate webispy/sdk:unstable docker image
 #
 
 jobs:
@@ -242,7 +242,7 @@ jobs:
           </p>
 
           <p>
-          API Document(doxygen): <a href="https://nugulinux.github.io/sdk-unstable/doxygen/">https://nugulinux.github.io/sdk-unstable/doxygen/</a>
+          API Document(doxygen): <a href="https://webispy.github.io/sdk-unstable/doxygen/">https://webispy.github.io/sdk-unstable/doxygen/</a>
           </p>
 
           <hr/>
@@ -259,13 +259,13 @@ jobs:
 
           <h3>Bionic (18.04)</h3>
           <pre>
-              echo "deb [trusted=yes] https://nugulinux.github.io/sdk-unstable/ubuntu/ bionic main" > /etc/apt/sources.list.d/nugudev.list
+              echo "deb [trusted=yes] https://webispy.github.io/sdk-unstable/ubuntu/ bionic main" > /etc/apt/sources.list.d/nugudev.list
               apt-get update
           </pre>
 
           <h3>Xenial (16.04)</h3>
           <pre>
-              echo "deb [trusted=yes] https://nugulinux.github.io/sdk-unstable/ubuntu/ xenial main" > /etc/apt/sources.list.d/nugudev.list
+              echo "deb [trusted=yes] https://webispy.github.io/sdk-unstable/ubuntu/ xenial main" > /etc/apt/sources.list.d/nugudev.list
               apt-get update
           </pre>
 
@@ -366,7 +366,7 @@ jobs:
         run: |
           echo "OS=$OSTYPE"
 
-          LAST_COMMIT=`docker run -t --rm nugulinux/sdk:unstable printenv | grep LAST_COMMIT`
+          LAST_COMMIT=`docker run -t --rm webispy/sdk:unstable printenv | grep LAST_COMMIT`
           echo $LAST_COMMIT
 
           if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -376,7 +376,7 @@ jobs:
           fi
 
           echo "SHORTSHA='${{ needs.check.outputs.sha }}'"
-          echo "nugulinux/sdk:unstable commit='${COMMIT}'"
+          echo "webispy/sdk:unstable commit='${COMMIT}'"
 
           if [[ "${COMMIT}" == "${{ needs.check.outputs.sha }}" ]]; then
             echo "Same version"
@@ -384,10 +384,10 @@ jobs:
           else
             echo "not match"
             cd docker
-            docker build --build-arg LAST_COMMIT=${{ needs.check.outputs.sha }} . -t nugulinux/sdk:unstable
+            docker build --build-arg LAST_COMMIT=${{ needs.check.outputs.sha }} . -t webispy/sdk:unstable
             cd -
           fi
       - name: Docker login
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
       - name: Publish
-        run: docker push nugulinux/sdk:unstable
+        run: docker push webispy/sdk:unstable
