@@ -20,7 +20,6 @@ RUN apt-get update && apt-get install -y software-properties-common ca-certifica
 	gstreamer1.0-pulseaudio \
 	libnugu \
 	libnugu-plugins-default \
-	libnugu-examples \
 	pulseaudio \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \

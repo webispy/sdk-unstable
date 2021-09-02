@@ -1,0 +1,102 @@
+name: Build docker only
+on:
+  push:
+    branches:
+      - dummy
+
+env:
+  REPO: nugu-linux
+  REPOSLUG: nugu-developers/nugu-linux
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.check.outputs.id }}
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - name: Get SHA and ID from Release ${{ github.ref }}
+        id: check
+        run: |
+          # Remove "refs/tags/" from "refs/tags/xxxxxxx"
+          SHORTSHA=$(echo ${GITHUB_REF} | cut -c11-)
+          echo "SHA: $SHORTSHA"
+
+          # Get ID for Release-tag
+          ID=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" -X GET https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${SHORTSHA} | jq '.id' -r)
+          echo "> Release ID = ${ID}"
+          if [[ ${ID} == "null" ]]; then
+            echo "Release ${ID} not exist."
+            exit
+          fi
+          echo "Release-ID: $ID"
+
+          echo "::set-output name=id::$ID"
+          echo "::set-output name=sha::$SHORTSHA"
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Generate docker image
+        id: check
+        run: |
+          echo "OS=$OSTYPE"
+
+          function docker_check() {
+            docker pull webispy/sdk:unstable
+          }
+
+          if docker_check; then
+            echo "Download success"
+          else
+            echo "Image not exist"
+            echo "::set-output name=commit::x"
+            exit
+          fi
+
+          LAST_COMMIT=`docker run -t --rm webispy/sdk:unstable printenv | grep LAST_COMMIT`
+          echo $LAST_COMMIT
+
+          COMMIT=
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+              COMMIT=$(echo $LAST_COMMIT | sed -r 's/LAST_COMMIT=(.*)/\1/' | tr -d '\r')
+          elif [[ "$OSTYPE" == "darwin"* ]]; then
+              COMMIT=$(echo $LAST_COMMIT | gsed -r 's/LAST_COMMIT=(.*)/\1/' | tr -d '\r')
+          fi
+
+          echo "webispy/sdk:unstable commit='${COMMIT}'"
+          echo "::set-output name=commit::${COMMIT}"
+
+          if [[ "${COMMIT}" == "${{ needs.check.outputs.sha }}" ]]; then
+            echo "Same version"
+          else
+            echo "not match"
+          fi
+      - name: Information
+        run: |
+          echo "${{ needs.check.outputs.sha }}"
+          echo "${{ steps.check.outputs.commit }}"
+      - name: Set up QEMU
+        if: ${{ steps.check.outputs.commit != needs.check.outputs.sha }}
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        if: ${{ steps.check.outputs.commit != needs.check.outputs.sha }}
+        uses: docker/setup-buildx-action@v1
+      - name: Login to GitHub Container Registry
+        if: ${{ steps.check.outputs.commit != needs.check.outputs.sha }}
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push
+        if: ${{ steps.check.outputs.commit != needs.check.outputs.sha }}
+        uses: docker/build-push-action@v2
+        with:
+          context: docker/.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: webispy/sdk:unstable
+          build-args: |
+            LAST_COMMIT=${{ needs.check.outputs.sha }}
