@@ -1,0 +1,69 @@
+name: Build agl
+on:
+  push:
+    branches:
+      - agl
+
+env:
+  REPO: nugu-linux
+  REPOSLUG: nugu-developers/nugu-linux
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [ koi_rpi4, koi_x64 ]
+    steps:
+      - name: Prepare SDK source
+        run: |
+          git clone https://github.com/${REPOSLUG} --recursive
+          cd ${REPO}
+          git checkout ${{ steps.check.outputs.sha }}
+          git reset --hard
+          rm -rf .git
+
+          # Fix permissions for docker
+          chmod 777 $PWD
+
+          ls -l
+
+      - name: Prepare AGL Docker image
+        run: docker pull ghcr.io/webispy/agl:${{ matrix.target }}
+
+      - name: Build
+        run: |
+          cd ${REPO}
+
+          cat <<EOF > sdkbuild.sh
+          #!/bin/bash
+          set -e
+
+          source /opt/agl-sdk/11.0.4-*/environment-setup-*
+
+          rm -rf build
+          mkdir build
+          cd build
+          cmake .. -DENABLE_OPUS_LIBRARY=ON \
+            -DENABLE_PORTAUDIO_PLUGIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_TOOLCHAIN_FILE=/opt/toolchain/Toolchain.cmake
+          make -j6
+
+          mkdir SDK
+          DESTDIR=SDK make install
+          tar cvfz files_agl_${{ matrix.target }}.tgz SDK
+          EOF
+
+          chmod 755 sdkbuild.sh
+
+          echo "> Build cross-compile"
+          docker run -t --rm -v $PWD:$PWD -w $PWD \
+              ghcr.io/webispy/agl:${{ matrix.target }} ./sdkbuild.sh
+
+          cp build/files_agl_${{ matrix.target }}.tgz /tmp/
+
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          path: /tmp/files_agl_${{ matrix.target }}.tgz
